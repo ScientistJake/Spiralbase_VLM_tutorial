@@ -1,0 +1,26 @@
+---
+title: "WGCNA_tutorial"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+We will use two datasets for this tutorial. The first is from Warner et al. 2018 and is from a Nematostella vectensis embryonic timeseries. The sampling is sparse, every 24 hours for 7 days, in duplicate (16 samples total). The second dataset is from Fisher et al. 2014 and is also from Nematostella vectensis. This timeseries is much denser, sampled hourly from 0-20 hours post fertilization in duplicate. For this tutorial we will subsample the data to include just 12-20 hours. The reason for this subsampling is to make the comparisons between the two datasets more straightforward and focus on zygotic transcription (assuming an MTZ of 10-12hpf).
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
