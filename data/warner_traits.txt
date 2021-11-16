@@ -1,0 +1,17 @@
+	24Hpf	48Hpf	72Hpf	96Hpf	120Hpf	144Hpf	168Hpf	192Hpf
+count_rep1_24Hpf	1	0	0	0	0	0	0	0
+count_rep2_24Hpf	1	0	0	0	0	0	0	0
+count_rep1_48Hpf	0	1	0	0	0	0	0	0
+count_rep2_48Hpf	0	1	0	0	0	0	0	0
+count_rep1_72Hpf	0	0	1	0	0	0	0	0
+count_rep2_72Hpf	0	0	1	0	0	0	0	0
+count_rep1_96Hpf	0	0	0	1	0	0	0	0
+count_rep2_96Hpf	0	0	0	1	0	0	0	0
+count_rep1_120Hpf	0	0	0	0	1	0	0	0
+count_rep2_120Hpf	0	0	0	0	1	0	0	0
+count_rep1_144Hpf	0	0	0	0	0	1	0	0
+count_rep2_144Hpf	0	0	0	0	0	1	0	0
+count_rep1_168Hpf	0	0	0	0	0	0	1	0
+count_rep2_168Hpf	0	0	0	0	0	0	1	0
+count_rep1_192Hpf	0	0	0	0	0	0	0	1
+count_rep2_192Hpf	0	0	0	0	0	0	0	1

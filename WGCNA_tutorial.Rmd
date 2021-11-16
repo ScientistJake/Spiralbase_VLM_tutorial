@@ -12,15 +12,188 @@ knitr::opts_chunk$set(echo = TRUE)
 We will use two datasets for this tutorial. The first is from Warner et al. 2018 and is from a Nematostella vectensis embryonic timeseries. The sampling is sparse, every 24 hours for 7 days, in duplicate (16 samples total). The second dataset is from Fisher et al. 2014 and is also from Nematostella vectensis. This timeseries is much denser, sampled hourly from 0-20 hours post fertilization in duplicate. For this tutorial we will subsample the data to include just 12-20 hours. The reason for this subsampling is to make the comparisons between the two datasets more straightforward and focus on zygotic transcription (assuming an MTZ of 10-12hpf).
 
 ```{r cars}
-summary(cars)
+fischer_data <- read.table(url("https://raw.githubusercontent.com/ScientistJake/Spiralbase_VLM_tutorial/main/data/Fischer_normalized_cpm.txt"), header = T, quote = "")
+warner_data <- read.table(url("https://raw.githubusercontent.com/ScientistJake/Spiralbase_VLM_tutorial/main/data/Warner_normalized_cpm.txt"), header = T, quote = "")
 ```
 
 ## Including Plots
 
-You can also embed plots, for example:
+These data have already been quantified against a transcriptome using bowtie2 and RSEM, normalized with EdgeR, and each transcript count was summed in term of each gene model from the draft genome. The only transformation we will do here is log2 transform
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r pressure}
+fischer_data_Log2 = log(fischer_data+1,2)
+warner_data_Log2 = log(warner_data+1,2)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Next we will explore the data using a simple PCA. This will give us a general idea of the structure of our data.
+```{r pca}
+library(ggplot2)
+library(tidyverse)
+
+warner_rep <- factor(c(1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2))
+warner_time <- factor(c("24hpa","24hpa","48hpa","48hpa","72hpa","72hpa","96hpa","96hpa","120hpa","120hpa","144hpa","144hpa","168hpa","168hpa","192hpa","192hpa"))
+
+warner_PCA_data <- warner_data_Log2 %>%
+  t() %>% #this puts samples as rows, genes as columns 
+  as.data.frame() %>%
+  prcomp() 
+
+warner_scores_to_plot <- as.data.frame(warner_PCA_data$x) 
+ggplot(data = warner_scores_to_plot, 
+       aes(x = PC1, y = PC2, 
+           label = rownames(warner_scores_to_plot), 
+           colour=factor(warner_time),
+           shape=factor(warner_rep)
+           )
+       ) + 
+  geom_point(size=3) + 
+  scale_fill_hue(l=40) + 
+  coord_fixed(ratio=1, xlim=range(warner_scores_to_plot$PC1), ylim=range(warner_scores_to_plot$PC2)) 
+```
+
+Do the same for the Fischer data:
+```{r PCA2}
+
+fischer_rep <- factor(c(1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2))
+fischer_time <- factor(c("12hpa","12hpa","13hpa","13hpa","14hpa","14hpa","15hpa","15hpa","16hpa","16hpa","17hpa","17hpa","18hpa","18hpa","19hpa","19hpa"))
+
+fischer_PCA_data <- fischer_data_Log2 %>%
+  t() %>% #this puts samples as rows, genes as columns 
+  as.data.frame() %>%
+  prcomp() 
+
+fischer_scores_to_plot <- as.data.frame(fischer_PCA_data$x) 
+ggplot(data = fischer_scores_to_plot, 
+       aes(x = PC1, y = PC2, 
+           label = rownames(fischer_scores_to_plot), 
+           colour=factor(fischer_time),
+           shape=factor(fischer_rep)
+           )
+       ) + 
+  geom_point(size=3) + 
+  scale_fill_hue(l=40) + 
+  coord_fixed(ratio=1, xlim=range(fischer_scores_to_plot$PC1), ylim=range(fischer_scores_to_plot$PC2)) 
+```
+
+## WGCNA
+Ok let's jump right into WGCNA. We'll clear everything out and start fresh. Depending on your dataset size WGCNA can use a lot of ram. Let's work through the Warner dataset first then do the Fischer data as a comparison
+
+```{r WGCNA_setup}
+rm(list = ls())
+gc()
+library(WGCNA)
+
+fischer_WGNCA_data <- read.table(url("https://raw.githubusercontent.com/ScientistJake/Spiralbase_VLM_tutorial/main/data/Fischer_normalized_cpm.txt"), header = T, quote = "") %>%
+  mutate_all(function(x) log(x+1,2)) %>%
+  t()
+
+warner_WGNCA_data <- read.table(url("https://raw.githubusercontent.com/ScientistJake/Spiralbase_VLM_tutorial/main/data/Warner_normalized_cpm.txt"), header = T, quote = "") %>%
+  mutate_all(function(x) log(x+1,2)) %>%
+  t()
+
+#Need to pick soft powers. This takes a while
+##Start with Fischer data
+powers = c(c(1:10), seq(from = 12, to=40, by=2))
+disableWGCNAThreads()
+sft = pickSoftThreshold(warner_WGNCA_data, powerVector = powers, verbose = 5, networkType = "signed")
+sft$powerEstimate
+
+{cex1 = 0.9;
+plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+     xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
+     main = paste("Scale independence"));
+text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+     labels=powers,cex=cex1,col="red");
+  # this line corresponds to using an R^2 cut-off of h
+abline(h=0.80,col="red")
+plot(sft$fitIndices[,1], sft$fitIndices[,5],
+     xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n",
+     main = paste("Mean connectivity"))
+text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=cex1,col="red")
+}
+
+softPower = 20 # (Read WGCNA tutorial to learn how to pick your power)
+rankExpr = rank(colMeans(warner_WGNCA_data))
+rankConn = rank(softConnectivity((warner_WGNCA_data),type="signed",power=softPower)) 
+
+enableWGCNAThreads()
+library(flashClust)
+
+adjacency = adjacency((warner_WGNCA_data),power=softPower,type="signed"); 
+diag(adjacency)=0
+Degree <- rowSums(adjacency)
+
+
+Degree=Degree/max(Degree); gc()
+dissTOM = 1-TOMsimilarity(adjacency, TOMType="signed") 
+geneTree = flashClust(as.dist(dissTOM), method="average")
+
+mColor=NULL
+for (ds in 0:3){
+  tree = cutreeHybrid(dendro = geneTree, pamStage=F, minClusterSize = (30-3*ds), deepSplit = ds, distM = dissTOM)
+  mColor=cbind(mColor,labels2colors(tree$labels)); }
+
+
+plotDendroAndColors(geneTree, mColor, paste("dpSplt =",0:3), main = "",dendroLabels=FALSE); 
+
+modules = mColor[,1] # (Chosen based on plot below)
+dynamicColors= labels2colors(modules)
+
+#print the module sizes
+table(modules)
+
+PCs = moduleEigengenes((warner_WGNCA_data), colors=modules)
+ME  = PCs$eigengenes
+MEDiss= 1-cor(ME)
+METree= flashClust(as.dist(MEDiss), method= "average")
+MEs= orderMEs(ME)
+
+plot(METree, main= "Clustering of module eigengenes", xlab= "", sub= "")
+
+#optional merge
+MEDissThres= 0.15
+merge= mergeCloseModules(warner_WGNCA_data, modules, cutHeight= MEDissThres, verbose =3)
+mergedColors= merge$colors
+
+library(reshape)
+ME_plot <- as.data.frame(t(MEs))
+colnames(ME_plot) = c(24,24,48,48,72,72,96,96,120,120,144,144,168,168,192,192)
+
+library(ggplot2)
+row.names(ME_plot) <- rownames(ME_plot)
+ME_plotM <- melt(as.matrix(ME_plot), id.vars="row.names", value.name="value")
+
+co = c("MEred")
+
+ME_plot_color <- ME_plotM[ME_plotM$X1 == paste(co),]
+  group <- c(1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2)
+  
+  p <-  ggplot(ME_plot_color, aes(x=as.numeric(as.character(ME_plot_color$X2)), y=value, colour=paste(co), group = group)) + 
+    geom_line(size =1.5) +
+    scale_x_continuous(minor_breaks = NULL, breaks=c(0,2,4,8,12,16,20,24,36,48,60,72,96,120,144)) +
+    ylab("Eigengene expression") +
+    xlab("Hours Post Fertilization")
+  
+# for(co in rownames(ME_plot)){
+#   ME_plot_color <- ME_plotM[ME_plotM$X1 == paste(co),]
+#   group <- c(1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3)
+#   
+#   p <-  ggplot(ME_plot_color, aes(x=as.numeric(as.character(ME_plot_color$X2)), y=value, colour=paste(co), group = group)) + 
+#     geom_line(size =1.5) +
+#     scale_x_continuous(minor_breaks = NULL, breaks=c(0,2,4,8,12,16,20,24,36,48,60,72,96,120,144)) +
+#     ylab("Eigengene expression") +
+#     xlab("Hours Post Amputation")
+#   
+#   file = paste("plots/WGCNA/ME_lines_R/ME_R_", co, ".pdf", sep="")
+#   pdf(file = file, width = 8, height = 6)
+#   print(p)
+#   dev.off()
+# }
+
+  
+traits <- read.table(file='traits.txt', sep='\t', header=T, quote="",row.names=1)
+
+
+  
+```
+
