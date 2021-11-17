@@ -9,9 +9,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## WGCNA tutorial for Sprialbase VLM 11/18/21
 
-This tutorial is intented to be a basic introduction to using WGCNA for RNAseq datasets. For this we will use transcriptomic data from the startlet sea anemone *Nematostella vectnensis* spanning the first seven days of development. This is not an ideal dataset, the sampling is sparse, every 24 hours for 7 days in duplicate. This sampling is more typical first approach used by embryologists to characterize and emerging model system. An ideal sampling design would be a very dense sampling of a discrete biological process (e.g. the timepoints surrounging a morphogenetic event). In any experimental design, WGCNA performs best with 16 samples or more. Fewer than this and identifying modules becomes very challenging.
+This tutorial is intented to be a basic introduction to using WGCNA for RNAseq datasets. For this we will use transcriptomic data from the startlet sea anemone *Nematostella vectnensis* spanning the first seven days of development [(Warner et al. 2018)](https://pubmed.ncbi.nlm.nih.gov/29739837/). This is not an ideal dataset, the sampling is sparse, every 24 hours for 7 days in duplicate. This sampling is more typical of a first approach used by embryologists to characterize and emerging model system. An ideal sampling design would be a very dense sampling of a discrete biological process (e.g. the timepoints surrounging a morphogenetic event). In any experimental design, WGCNA performs best with 16 samples or more. Fewer than this and identifying modules becomes very challenging.
 
-First let's read in the data.These data have already been quantified against a transcriptome using bowtie2 and RSEM, normalized with EdgeR, and each transcript count was summed in term of each gene model from the draft genome. The only transformation we will do here is log2 transform
+First let's read in the data.These data have already been quantified against a transcriptome using bowtie2 and RSEM, normalized with EdgeR, and each transcript count was summed in term of each gene model from the draft genome. The only transformation we will do here is a log2 transform.
 
 ```{r message=FALSE, warning=FALSE}
 warner_data <- read.table(url("https://raw.githubusercontent.com/ScientistJake/Spiralbase_VLM_tutorial/main/data/Warner_normalized_cpm.txt"), header = T, quote = "")
@@ -44,9 +44,9 @@ ggplot(data = warner_scores_to_plot,
   coord_fixed(ratio=1, xlim=range(warner_scores_to_plot$PC1), ylim=range(warner_scores_to_plot$PC2)) 
 ```
 
-In this plot we can see there's a lot of variation in the first two days (as is expected), while later timepoints the transcriptomic differences become less pronounced. We'll keep this in mind since this means we will likely observe very large modules that correlate to 24hpf and 48hpf that will be difficult to tease out. Looking at these data it will be easier to draw conclusion for modules that are activated later in development.
+In this plot we can see there's a lot of variation in the first two days (as is expected), while later at timepoints the transcriptomic differences become less pronounced. We'll keep this in mind since this means we will likely observe very large modules that correlate to 24hpf and 48hpf that will be difficult to tease out.
 
-Let's proceed with WGCNA below. We're going to read in the data and again apply a log2 transformation. It is important NOT to filter the data by differential expression or variance beforehand. Doing so will result in a few very large modules that correlate to your filtering criteria. Don't worry though, all of the low variance genes will fall into the background. The first step is to read in the data and choose the soft power. Soft-thresholding power is a key parameter in scale free networks such as WGCNA. When using timeseries data it's normal to not have an R^2 that exceeds 0.90. This is because time series data, or perturbation data for that matter, include strong drivers of variance. In these cases, and especially for datasets that span long timeseries, you can try choosing a soft power that crosses a lower threshold like 0.80 or pick a generic soft power [as outlined in faq 6 here](https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/faq.html).
+Let's proceed with WGCNA below. We're going to read in the data and again apply a log2 transformation. It is important NOT to filter the data by differential expression or variance beforehand. Doing so will result in a few very large modules that correlate to your filtering criteria. Don't worry, all of the low variance genes will fall into the background (grey module). The first step is to read in the data and choose the soft power. Soft-thresholding power is a key parameter in scale free networks such as WGCNA. When using timeseries data it's normal to not have an R^2 that exceeds 0.90. This is because time series data, or perturbation data for that matter, include strong drivers of variance. In these cases, and especially for datasets that span long timeseries, you can try choosing a soft power that crosses a lower threshold like 0.80 or pick a generic soft power [as outlined in faq 6 here](https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/faq.html).
 
 ```{r message=FALSE, warning=FALSE}
 rm(list = ls())
@@ -104,10 +104,11 @@ for (ds in 0:3){
 plotDendroAndColors(geneTree, mColor, paste("dpSplt =",0:3), main = "",dendroLabels=FALSE); 
 ```
 
-Looking at this tree the first thing that pops out is the size of the branches and clusters which are very large. This is typical of embryonic timeseries data since there are massive differences between each timepoint. Here, I would recommend a deepsplit of 1 since there appears to be some subsctrucutre to the three in the smaller modules that is missed in the deppsplit 0. As stated above, I would try this several ways. 
+Looking at this tree the first thing that pops out is the size of the branches and clusters which are very large. This is typical of embryonic timeseries data since there are massive differences between each timepoint. Here, I would recommend a deepsplit of 1 since there appears to be some subsctrucutre to the three branches in the middle and results in smaller modules as opposed to dewpsplit 0. As stated above, I would try this several ways. 
 
 ```{r message=FALSE, warning=FALSE}
-modules = mColor[,2] # (Chosen based on plot below)
+#pick a module deep split
+modules = mColor[,2]
 dynamicColors= labels2colors(modules)
 
 #print the module sizes
@@ -116,7 +117,7 @@ table(modules)
 
 You can see from the results above that the modules are quite large but with the deeplsplit we can recover smaller more managable modules. `grey` is reserved for unassigned so a third of the genes here aren't in any module.
 
-Next we'll extract [eigengenes](https://en.wiktionary.org/wiki/eigengene) which summarize the expression of each module. Here, we're only plotting the eigengenes for one module, 'salmon', but I included a commented section of code below that which will loop through the modules and save each plot into a directory. I also include the replicate information in my plots to see if one replicate is a significant driver of a particular module.
+Next we'll extract [eigengenes](https://en.wiktionary.org/wiki/eigengene) which summarize the expression of each module. Here, we're only plotting the eigengenes for one module, 'cyan', but I included a commented section of code below that which will loop through the modules and save each plot into a directory. I also include the replicate information in my plots to see if one replicate is a significant driver of a particular module.
 ```{r message=FALSE, warning=FALSE}
 PCs = moduleEigengenes((warner_WGNCA_data), colors=modules)
 ME  = PCs$eigengenes
@@ -141,7 +142,7 @@ library(ggplot2)
 row.names(ME_plot) <- rownames(ME_plot)
 ME_plotM <- melt(as.matrix(ME_plot), id.vars="row.names", value.name="value")
 
-co = c("MEsalmon")
+co = c("MEcyan")
 
 ME_plot_color <- ME_plotM[ME_plotM$X1 == paste(co),]
   group <- c(1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2)
@@ -208,29 +209,31 @@ labeledHeatmap(Matrix = moduleTraitCor,
 As you can see, most of our modules have a strong correlation/ anti-correlation with the first time point. This is to be expected as it is the most distinct in terms of gene expression. We do observe some other interesting modules however like those that correlate to 48hpf or the later developmental timepoints.
 
 This is usually a good place to stop, bind your module assignments to a count table / annotation table and look through your data in detail. Then go back and choose different parameters (e.g. a deeper split, or module merging) until the data makes the most sense to your trained biologist eye. Below is a few lines of code that will do that. Remember that the module vector is in the same order as the original count data so you can bind it directly to the count table and it will be correct. Below I read in the original counts, merge the annotations (keeping the order of the count table), and add the module assignment vector.
-```{r include=FALSE,message=FALSE, warning=FALSE }
-## do not run, will not work with this repo
 
-annotations = read.table(file= "annotations.txt", sep='\t', header=T, quot="")
-counts = read.table(file="normalized_cpm.txt", sep='\t', header=T)
-master = merge(master,annotations, by.x='row.names',by.y='gene_ID', all.x=T)
+```{r include=FALSE,message=FALSE, warning=FALSE }
+
+annotations = read.table(url("https://raw.githubusercontent.com/ScientistJake/Spiralbase_VLM_tutorial/main/data/Nemve1_annotated_uprotnames.txt"), sep='\t', header=T, quote="")
+warner_data <- read.table(url("https://raw.githubusercontent.com/ScientistJake/Spiralbase_VLM_tutorial/main/data/Warner_normalized_cpm.txt"), header = T, quote = "")
+
+master = merge(warner_data,annotations, by.x='row.names',by.y='ContigName', all.x=T)
 master$module = modules
-master$module_merged = mergedColors
-write.table(master,file="master_annotations.txt", sep='\t',row.names = F,quote=F)
+#if merging was performed
+#master$module_merged = mergedColors
+#write.table(master,file="data/master_annotations.txt", sep='\t',row.names = F,quote=F)
 ```
 
-If our modules are discrete enough, we can calculate the intra-module connectivity of each gene. This will allow us to identify hub genes aka genes with high connectivity to many other genes within a module. In theory, these genes are important to the function of the module as a whole. In application this theory typically holds up rather well with hub genes representing key markers / differentiation factors / gene products that are activated in a cell under certain conditions. 
+If our modules are discrete enough, we can calculate the intra-module connectivity of each gene. This will allow us to identify hub genes aka genes with high connectivity to many other genes within a module. In theory, these genes are important to the function of the module as a whole. In application this theory typically holds up rather well with hub genes representing key markers / differentiation factors / gene products that are activated in a cell under certain conditions *assuming that your modules are not too large and correlate to discrete biological events*. 
 
-In datasets like this one, it is futile to try and identify hub genes for the large modules. There will simply be too many genes with very high connectivity. So if you are most interested in the modules activated at 24hpf I would recommend resampling at a tighter time interval around this timepoint. Here, we'll exam the salmon module since it is relatively small and has an interesting expression pattern peaking at 48hpf. Below is some code that will export the connectivity data in a format that is directly accepted by [visant](http://www.visantnet.org/visantnet.html). This will make two tables, one that includes connections over a connection strength of 0.05 to exlcude weak connections and another that includes just the top 250 genes. You can modify these or add additional exports with different cutoffs if your lists are too small/large.  I also included a commented code set to loop this and export tables for all modules. 
+In datasets like this one, it is futile to try and identify hub genes for the large modules. There will simply be too many genes with very high connectivity. So if you are most interested in the modules activated at 24hpf I would recommend resampling at a tighter time interval around this timepoint. Here, we'll exam the cyan module since it is relatively small and has an interesting expression pattern peaking at 48hpf. Below is some code that will export the connectivity data in a format that is directly accepted by [visant](http://www.visantnet.org/visantnet.html). This will make two tables, one that includes connections over a connection strength of 0.05 to exlcude weak connections and another that includes just the top 250 genes. You can modify these or add additional exports with different cutoffs if your lists are too small/large.  I also included a commented code set to loop this and export tables for all modules. 
 
 ```{r message=FALSE, warning=FALSE}
 # go for visant
 TOM = TOMsimilarity(adjacency, TOMType="signed") 
 
 #we need some annotations otherwise we'll be looking at useless gene IDs
-annotations = read.table(url("https://raw.githubusercontent.com/ScientistJake/Spiralbase_VLM_tutorial/main/data/Nemve1_annotated_uprotnames.txt"), sep='\t', header=T, quote="",row.names=1)
+annotations = read.table(url("https://raw.githubusercontent.com/ScientistJake/Spiralbase_VLM_tutorial/main/data/Nemve1_annotated_uprotnames.txt"), sep='\t', header=T, quote="")
 
-module = "salmon";
+module = "cyan";
 probes = colnames(warner_WGNCA_data)
   inModule = (modules==module);
   modProbes = probes[inModule];
@@ -242,9 +245,8 @@ probes = colnames(warner_WGNCA_data)
   # Export the network into an edge list file VisANT can read
   vis = exportNetworkToVisANT(modTOM,file = paste("data/VisANTInput-", module, "_0.05.txt", sep=""),
     weighted = TRUE,
-    threshold = 0.05
-    #below is helper function where you can replace the gene ID with a common name. Just pass it two vectors, one of the IDs and one of the common names
-    #,probeToGene = data.frame(annotations$gene.ID, annotations$Gene.Name) 
+    threshold = 0.05,
+    probeToGene = data.frame(annotations$ContigName, annotations$Description) 
     )
   write.table(vis, file= paste("data/VisANTInput-", module, "_0.05.txt", sep=""),sep='\t',row.names = F,quote=F)
   
@@ -254,183 +256,52 @@ probes = colnames(warner_WGNCA_data)
   top = (rank(-IMConn) <= nTop)
   vis = exportNetworkToVisANT(modTOM[top, top],file = paste("data/VisANTInput-", module, "-top",nTop,".txt", sep=""),
     weighted = TRUE,
-    threshold = 0
-    #,probeToGene = data.frame(annotations$L_var_ID, annotations$SPU.common_name) 
+    threshold = 0,
+    probeToGene = data.frame(annotations$ContigName, annotations$Description)
   )
   write.table(vis, file=paste("data/VisANTInput-", module, "-top",nTop,".txt", sep=""),sep='\t',row.names = F,quote=F)
+
+# #use this loop to bulk generate visant tables:
+# 
+# for (module in unique(module_colors)[which(unique(module_colors) != "grey")]){
+#   # Select module probes
+#   probes = colnames(warner_WGNCA_data)
+#   inModule = (modules==module);
+#   modProbes = probes[inModule];
+# 
+#   # Select the corresponding Topological Overlap
+#   modTOM = TOM[inModule, inModule];
+#   dimnames(modTOM) = list(modProbes, modProbes)
+#   
+#   # Export the network into an edge list file VisANT can read
+#   vis = exportNetworkToVisANT(modTOM,file = paste("data/VisANTInput-", module, "_0.05.txt", sep=""),
+#     weighted = TRUE,
+#     threshold = 0.05,
+#     probeToGene = data.frame(annotations$ContigName, annotations$Description)
+#   )
+#   write.table(vis, file= paste("data/VisANTInput-", module, "_0.05.txt", sep=""),sep='\t',row.names = F,quote=F)
+#  
+#   nTop = 250;
+#   IMConn = softConnectivity(warner_WGNCA_data[, modProbes]);
+#   top = (rank(-IMConn) <= nTop)
+#   vis = exportNetworkToVisANT(modTOM[top, top],file = paste("data/VisANTInput-", module, "-top",nTop,".txt", sep=""),
+#     weighted = TRUE,
+#     threshold = 0,
+#     probeToGene = data.frame(annotations$ContigName, annotations$Description)
+#   )
+#   write.table(vis, file=paste("data/VisANTInput-", module, "-top",nTop,".txt", sep=""),sep='\t',row.names = F,quote=F)
+#   
+# }
 ```
 
-Occasionally these tables need some massaging before getting them into visant. If your gene IDs have unallowed characters like commas or whatever you can replace those with udnerscores in excel or an editor. For huge lists, I also will sort the data by connection strength (last column) and take the top 5000 connections.
+Occasionally these tables need some massaging before getting them into visant. If your gene IDs have unallowed characters like commas, spaces, or whatever you can replace those with underscores in excel or an editor. For huge lists, I also would sort the data by connection strength (last column) and take the top 5,000-10,000 connections. Once in visant, you can further threshold by connection strength and widdle it down to the few ndoes with highest connections. Again, this works best when you have small, discrete modules that correlate highly to a process, treatment, or timepoint. If they're too large they will get clogged up with genes that maintain basic cellular functions and that aren't strongly correlated to your process of interest. 
 
-```{r fischer_1}
-rm(list = ls())
-gc()
-library(WGCNA)
+In these data, most of the modules will be difficult to analyze using visant since the sampling is so sparse. The cyan module was small enough that some interesting factors could be identified:
+![visant plot cyan](data/cyan_visant.png)
 
-fischer_WGNCA_data <- read.table(url("https://raw.githubusercontent.com/ScientistJake/Spiralbase_VLM_tutorial/main/data/Fischer_normalized_cpm.txt"), header = T, quote = "") %>%
-  mutate_all(function(x) log(x+1,2)) %>%
-  t()
+Trust your biologist eye to figure out what modules are doing. Alterantively, you can use module identities to subset your data and run GO-term enrichments. This will let you pick out biologically relevant modules and focus your efforts! Good luck!
+Please don't hesitate to reach out at warnerj@uncw.edu with any questions!
 
-#Need to pick soft powers. This takes a while
-powers = c(c(1:10), seq(from = 12, to=40, by=2))
-disableWGCNAThreads()
-sft = pickSoftThreshold(fischer_WGNCA_data, powerVector = powers, verbose = 5, networkType = "signed")
-sft$powerEstimate
-
-{cex1 = 0.9;
-plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
-     xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
-     main = paste("Scale independence"));
-text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
-     labels=powers,cex=cex1,col="red");
-  # this line corresponds to using an R^2 cut-off of h
-abline(h=0.80,col="red")
-plot(sft$fitIndices[,1], sft$fitIndices[,5],
-     xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n",
-     main = paste("Mean connectivity"))
-text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=cex1,col="red")
-}
-
-softPower = 16 # (Read WGCNA tutorial to learn how to pick your power)
-rankExpr = rank(colMeans(fischer_WGNCA_data))
-rankConn = rank(softConnectivity((fischer_WGNCA_data),type="signed",power=softPower)) 
-
-enableWGCNAThreads()
-library(flashClust)
-
-adjacency = adjacency((fischer_WGNCA_data),power=softPower,type="signed"); 
-diag(adjacency)=0
-Degree <- rowSums(adjacency)
-
-
-Degree=Degree/max(Degree); gc()
-dissTOM = 1-TOMsimilarity(adjacency, TOMType="signed") 
-geneTree = flashClust(as.dist(dissTOM), method="average")
-
-mColor=NULL
-for (ds in 0:3){
-  tree = cutreeHybrid(dendro = geneTree, pamStage=F, minClusterSize = (30-3*ds), deepSplit = ds, distM = dissTOM)
-  mColor=cbind(mColor,labels2colors(tree$labels)); }
-
-
-plotDendroAndColors(geneTree, mColor, paste("dpSplt =",0:3), main = "",dendroLabels=FALSE); 
-
-modules = mColor[,1] # (Chosen based on plot below)
-dynamicColors= labels2colors(modules)
-
-#print the module sizes
-table(modules)
-
-PCs = moduleEigengenes((fischer_WGNCA_data), colors=modules)
-ME  = PCs$eigengenes
-MEDiss= 1-cor(ME)
-METree= flashClust(as.dist(MEDiss), method= "average")
-MEs= orderMEs(ME)
-
-plot(METree, main= "Clustering of module eigengenes", xlab= "", sub= "")
-
-#optional merge
-MEDissThres= 0.15
-merge= mergeCloseModules(fischer_WGNCA_data, modules, cutHeight= MEDissThres, verbose =3)
-mergedColors= merge$colors
-
-library(reshape)
-ME_plot <- as.data.frame(t(MEs))
-colnames(ME_plot) = c(24,24,48,48,72,72,96,96,120,120,144,144,168,168,192,192)
-
-library(ggplot2)
-row.names(ME_plot) <- rownames(ME_plot)
-ME_plotM <- melt(as.matrix(ME_plot), id.vars="row.names", value.name="value")
-
-co = c("MEred")
-
-ME_plot_color <- ME_plotM[ME_plotM$X1 == paste(co),]
-  group <- c(1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2)
-  
-  p <-  ggplot(ME_plot_color, aes(x=as.numeric(as.character(ME_plot_color$X2)), y=value, colour=paste(co), group = group)) + 
-    geom_line(size =1.5) +
-    scale_x_continuous(minor_breaks = NULL, breaks=c(0,2,4,8,12,16,20,24,36,48,60,72,96,120,144)) +
-    ylab("Eigengene expression") +
-    xlab("Hours Post Fertilization")
-  
-  print(p)
-  
-# for(co in rownames(ME_plot)){
-#   ME_plot_color <- ME_plotM[ME_plotM$X1 == paste(co),]
-#   group <- c(1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3,1,2,3)
-#   
-#   p <-  ggplot(ME_plot_color, aes(x=as.numeric(as.character(ME_plot_color$X2)), y=value, colour=paste(co), group = group)) + 
-#     geom_line(size =1.5) +
-#     scale_x_continuous(minor_breaks = NULL, breaks=c(0,2,4,8,12,16,20,24,36,48,60,72,96,120,144)) +
-#     ylab("Eigengene expression") +
-#     xlab("Hours Post Amputation")
-#   
-#   file = paste("plots/WGCNA/ME_lines_R/ME_R_", co, ".pdf", sep="")
-#   pdf(file = file, width = 8, height = 6)
-#   print(p)
-#   dev.off()
-# }
-
-  
-traits <- read.table(url("https://raw.githubusercontent.com/ScientistJake/Spiralbase_VLM_tutorial/main/data/warner_traits.txt"), sep='\t', header=T, quote="",row.names=1)
-
-nGenes = ncol(fischer_WGNCA_data)
-nSamples = nrow(fischer_WGNCA_data)
-moduleTraitCor = cor(ME, traits, use = "p");
-moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples)
-
-textMatrix = paste(signif(moduleTraitCor, 2), "\n(",signif(moduleTraitPvalue, 1), ")", sep = "");
-dim(textMatrix) = dim(moduleTraitCor)
-library('viridis')
-library(RColorBrewer)
-colors = colorRampPalette(rev(brewer.pal(n = 9, name ="RdYlBu")))(200)
-
-labeledHeatmap(Matrix = moduleTraitCor,
-  xLabels = c("24hpf","48hpf","72hpf","96hpf","120hpf","148hpf","168hpf","192hpf"),
-  yLabels = names(ME),
-  colorLabels = FALSE,
-  colors = colors,
-  textMatrix = textMatrix,
-  setStdMargins = F,
-  cex.text = 0.5,
-  zlim = c(-1,1),
-  verticalSeparator.x = 1:dim(moduleTraitCor)[2],
-  verticalSeparator.col="grey80",
-  horizontalSeparator.y = 1:dim(moduleTraitCor)[1],
-  horizontalSeparator.col="grey80",
-  main = paste("Module-hpf relationships")
-  )
-
-# go for visant
-TOM = TOMsimilarity(adjacency, TOMType="signed") 
-
-module = "red";
-probes = colnames(warner_WGNCA_data)
-  inModule = (modules==module);
-  modProbes = probes[inModule];
-  
-  # Select the corresponding Topological Overlap
-  modTOM = TOM[inModule, inModule];
-  dimnames(modTOM) = list(modProbes, modProbes)
-  
-  # Export the network into an edge list file VisANT can read
-  vis = exportNetworkToVisANT(modTOM,file = paste("data/VisANTInput-", module, "_0.05.txt", sep=""),
-    weighted = TRUE,
-    threshold = 0.05
-    #below is helper function where you can replace the gene ID with a common name. Just pass it two vectors, one of the IDs and one of the common names
-    #,probeToGene = data.frame(annotations$gene.ID, annotations$Gene.Name) 
-    )
-  write.table(vis, file= paste("data/VisANTInput-", module, "_0.05.txt", sep=""),sep='\t',row.names = F,quote=F)
-  
-  #now export just the top 250 connections
-  nTop = 250;
-  IMConn = softConnectivity(fischer_WGNCA_data[, modProbes]);
-  top = (rank(-IMConn) <= nTop)
-  vis = exportNetworkToVisANT(modTOM[top, top],file = paste("data/VisANTInput-", module, "-top",nTop,".txt", sep=""),
-    weighted = TRUE,
-    threshold = 0
-    #,probeToGene = data.frame(annotations$L_var_ID, annotations$SPU.common_name) 
-  )
-  write.table(vis, file=paste("data/VisANTInput-", module, "-top",nTop,".txt", sep=""),sep='\t',row.names = F,quote=F)
-
+```{r session}
+sessionInfo()
 ```
